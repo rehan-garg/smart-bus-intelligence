@@ -18,6 +18,7 @@ from sqlalchemy import select
 from app.services.traffic_service import create_or_update_hotspot
 
 from app.models.traffic_hotspot import TrafficHotspot
+from app.services.realtime import manager
 
 
 router = APIRouter(
@@ -72,10 +73,28 @@ async def create_traffic_observation(
 
     await db.refresh(traffic_observation)
 
-    await create_or_update_hotspot(
+    hotspot = await create_or_update_hotspot(
         db,
         traffic_observation
     )
+
+    await manager.broadcast({
+        "type": "TRAFFIC_HOTSPOT_UPDATE",
+        "hotspot": {
+            "id": str(hotspot.id),
+            "location": {
+                "latitude": hotspot.latitude,
+                "longitude": hotspot.longitude
+            },
+            "avg_vehicle_count": hotspot.avg_vehicle_count,
+            "peak_vehicle_count": hotspot.peak_vehicle_count,
+            "observation_count": hotspot.observation_count,
+            "unique_bus_count": hotspot.unique_bus_count,
+            "congestion_level": hotspot.congestion_level,
+            "first_detected_at": hotspot.first_detected_at.isoformat(),
+            "last_detected_at": hotspot.last_detected_at.isoformat()
+        }
+    })
 
     return {
         "message": "Traffic observation created",

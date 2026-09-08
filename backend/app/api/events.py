@@ -7,9 +7,11 @@ from app.db.database import get_db
 from app.schemas.event import EventCreate
 from app.models.event import Event
 from app.models.road_issue import RoadIssue
+from app.services.realtime import manager
 
 from fastapi import HTTPException
 from uuid import UUID
+
 
 
 router = APIRouter(
@@ -121,6 +123,23 @@ async def create_event(
 
     await db.commit()
     await db.refresh(event)
+
+    await manager.broadcast({
+        "type": "ROAD_ISSUE_UPDATE",
+        "road_issue": {
+            "id": str(road_issue.id),
+            "issue_type": road_issue.issue_type,
+            "location": {
+                "latitude": road_issue.latitude,
+                "longitude": road_issue.longitude
+            },
+            "detection_count": road_issue.detection_count,
+            "max_confidence": road_issue.max_confidence,
+            "severity": road_issue.severity,
+            "first_detected_at": road_issue.first_detected_at.isoformat(),
+            "last_detected_at": road_issue.last_detected_at.isoformat()
+        }
+    })
 
     return {
         "message": "Event created and linked to road issue",
